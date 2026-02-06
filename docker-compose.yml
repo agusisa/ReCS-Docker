@@ -1,0 +1,16 @@
+# ReCS-Docker (No-Steam). Usar desde la carpeta del fork, después de:
+#   docker build -t hlds_build -f build .
+#   docker build -t hlds_deploy -f deploy .
+# Puerto 27016 para no chocar con el servidor Steam (27015).
+services:
+  recs-server:
+    image: hlds_deploy
+    container_name: recs-server
+    ports:
+      - "0.0.0.0:27016:27015/udp"
+      - "0.0.0.0:27016:27015/tcp"
+    volumes:
+      - ./cstrike/server.cfg:/hlds/cstrike/server.cfg
+      - ./cstrike/mapcycle.txt:/hlds/cstrike/mapcycle.txt
+      - ./cstrike/maps:/hlds/cstrike/maps
+    restart: unless-stopped
