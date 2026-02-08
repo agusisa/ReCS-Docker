@@ -219,6 +219,7 @@ public fwd_touch(kit, id)
 		engfunc(EngFunc_RemoveEntity, kit);
 		g_player_data[id][HAS_KIT] = true;
 		client_cmd(id, "spk %s", SOUND_EQUIP);
+		client_print(id, print_chat, "[Revival] Recogiste un kit. Mantén E sobre un compañero muerto para revivirlo.");
 	}
 	return FMRES_IGNORED;
 }
@@ -290,7 +291,7 @@ public drop_kit(id)
 		set_pev(kit, pev_classname, ENTITY_KIT);
 		engfunc(EngFunc_SetModel, kit, MODEL_RKIT);
 		engfunc(EngFunc_SetOrigin, kit, origin);
-		engfunc(EngFunc_SetSize, kit, Float:{-2.5, -2.5, -1.5}, Float:{2.5, 2.5, 1.5});
+		engfunc(EngFunc_SetSize, kit, Float:{-16.0, -16.0, -16.0}, Float:{16.0, 16.0, 16.0});
 		set_pev(kit, pev_solid, SOLID_TRIGGER);
 		set_pev(kit, pev_movetype, MOVETYPE_TOSS);
 	}
