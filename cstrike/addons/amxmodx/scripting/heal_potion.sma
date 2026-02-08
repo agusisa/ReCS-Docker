@@ -1,5 +1,5 @@
-// Heal Potion v2 - Pocion como 4ta "granada". Todos tienen 1 al spawn (una sola por ronda).
-// Bind g +potion, tecla 4, mantén G: LClick=tirar (cura area, onda azul), RClick=beber.
+// Heal Potion v3 - Poción como HE en el inventario. Todos tienen 1 al spawn.
+// Bind g +potion, seleccioná la HE (granada), mantén G + LClick=tirar. /beber o bind para beber.
 
 #include <amxmodx>
 #include <fakemeta>
@@ -11,16 +11,16 @@
 #pragma semicolon 1
 
 #define PLUGIN   "Heal Potion (Blue)"
-#define VERSION  "2.0"
+#define VERSION  "3.0"
 #define AUTHOR   "Gandármara"
 
 #define POTION_CLASSNAME "heal_potion_ent"
 #define TASK_POTION_EXPLODE 9000
 
-// Modelos: poción distinta a HE (usamos flash como base visual; se puede cambiar por custom)
-new const V_MODEL[] = "models/v_flashbang.mdl";   // en mano (azul se puede con custom)
+// Modelos: poción (usamos flash como vista en mano; en mundo al tirar)
+new const V_MODEL[] = "models/v_flashbang.mdl";
 new const P_MODEL[] = "models/p_flashbang.mdl";
-new const W_MODEL[] = "models/w_flashbang.mdl";   // en el mundo al tirar
+new const W_MODEL[] = "models/w_flashbang.mdl";
 
 new const SOUND_DRINK[] = "items/smallmedkit1.wav";
 new const SPRITE_RING[] = "sprites/white.spr";    // para la onda azul
@@ -36,14 +36,16 @@ public plugin_init()
 
 	register_clcmd("say /potion", "CmdGivePotion");
 	register_clcmd("say_team /potion", "CmdGivePotion");
+	register_clcmd("say /beber", "CmdDrinkPotion");
+	register_clcmd("say_team /beber", "CmdDrinkPotion");
+	register_clcmd("potion_drink", "CmdDrinkPotion");
 	register_clcmd("+potion", "CmdPotionModeOn");
 	register_clcmd("-potion", "CmdPotionModeOff");
 	register_clcmd("potion", "CmdPotionToggle");
 
 	RegisterHam(Ham_Spawn, "player", "HamPlayerSpawn", true);
 	RegisterHam(Ham_Touch, POTION_CLASSNAME, "HamPotionTouch", false);
-	RegisterHam(Ham_Weapon_PrimaryAttack, "weapon_flashbang", "HamFlashPrimary", false);
-	RegisterHam(Ham_Weapon_SecondaryAttack, "weapon_flashbang", "HamFlashSecondary", false);
+	RegisterHam(Ham_Weapon_PrimaryAttack, "weapon_hegrenade", "HamHePotionPrimary", false);
 	register_event("DeathMsg", "EvDeath", "a");
 	register_event("CurWeapon", "EvCurWeapon", "be", "1=1");
 
@@ -87,7 +89,7 @@ public HamPlayerSpawn(id)
 	g_InPotionMode[id] = false;
 	// Todos tienen 1 poción al comenzar la partida (una sola)
 	g_PotionCount[id] = 1;
-	// Dar flashbang para que la poción figure en el slot 4 (lista de granadas)
+	// Dar 1 HE para que la poción figure en el inventario (granadas)
 	set_task(0.2, "TaskGivePotionWeapon", id);
 	return HAM_IGNORED;
 }
@@ -96,9 +98,9 @@ public TaskGivePotionWeapon(id)
 {
 	if (!is_user_alive(id)) return;
 	if (g_PotionCount[id] <= 0) return;
-	// Una flashbang = representa la poción en el slot de granadas
-	if (cs_get_user_bpammo(id, CSW_FLASHBANG) < 1)
-		give_item(id, "weapon_flashbang");
+	// Una HE = representa la poción en la lista de granadas
+	if (cs_get_user_bpammo(id, CSW_HEGRENADE) < 1)
+		give_item(id, "weapon_hegrenade");
 }
 
 public CmdGivePotion(id)
@@ -107,11 +109,22 @@ public CmdGivePotion(id)
 	// Máximo 1 poción; si ya tiene, no sumar
 	if (g_PotionCount[id] >= 1)
 	{
-		client_print(id, print_chat, "[Potion] Solo podés tener 1 poción. Bind: bind g +potion, tecla 4, mantén G: LClick=tirar, RClick=beber.");
+		client_print(id, print_chat, "[Potion] Solo podés tener 1 poción. Bind g +potion, seleccioná la HE, mantén G + LClick=tirar. /beber para beber.");
 		return PLUGIN_HANDLED;
 	}
 	g_PotionCount[id] = 1;
-	client_print(id, print_chat, "[Potion] +1 poción. Bind g +potion, tecla 4, mantén G: LClick=tirar, RClick=beber.");
+	client_print(id, print_chat, "[Potion] +1 poción. Bind g +potion, seleccioná la HE, mantén G + LClick=tirar. /beber para beber.");
+	return PLUGIN_HANDLED;
+}
+
+public CmdDrinkPotion(id)
+{
+	if (!is_user_alive(id)) return PLUGIN_HANDLED;
+	if (g_PotionCount[id] <= 0) {
+		client_print(id, print_chat, "[Potion] No tenés poción.");
+		return PLUGIN_HANDLED;
+	}
+	DrinkPotion(id);
 	return PLUGIN_HANDLED;
 }
 
@@ -119,9 +132,8 @@ public CmdPotionModeOn(id)
 {
 	if (!is_user_alive(id) || g_PotionCount[id] <= 0) return PLUGIN_HANDLED;
 	g_InPotionMode[id] = true;
-	// Cambiar a slot 4 (flash) para que se vea la "poción" en mano con nuestro modelo
-	if (get_user_weapon(id) != CSW_FLASHBANG)
-		client_cmd(id, "weapon_flashbang");
+	if (get_user_weapon(id) != CSW_HEGRENADE)
+		client_cmd(id, "weapon_hegrenade");
 	return PLUGIN_HANDLED;
 }
 public CmdPotionModeOff(id) { g_InPotionMode[id] = false; return PLUGIN_HANDLED; }
@@ -138,34 +150,23 @@ public CmdPotionToggle(id)
 public EvCurWeapon(id)
 {
 	if (!is_user_alive(id)) return;
-	if (g_InPotionMode[id] && g_PotionCount[id] > 0 && get_user_weapon(id) == CSW_FLASHBANG)
+	if (g_InPotionMode[id] && g_PotionCount[id] > 0 && get_user_weapon(id) == CSW_HEGRENADE)
 	{
 		set_pev(id, pev_viewmodel2, V_MODEL);
 		set_pev(id, pev_weaponmodel2, P_MODEL);
 	}
 }
 
-public HamFlashPrimary(weaponEnt)
+public HamHePotionPrimary(weaponEnt)
 {
 	new id = get_pdata_cbase(weaponEnt, 41, 5);
 	if (id < 1 || id > 32) return HAM_IGNORED;
 	if (g_InPotionMode[id] && g_PotionCount[id] > 0)
 	{
 		ThrowPotion(id);
-		cs_set_user_bpammo(id, CSW_FLASHBANG, 0);
-		return HAM_SUPERCEDE;
-	}
-	return HAM_IGNORED;
-}
-
-public HamFlashSecondary(weaponEnt)
-{
-	new id = get_pdata_cbase(weaponEnt, 41, 5);
-	if (id < 1 || id > 32) return HAM_IGNORED;
-	if (g_InPotionMode[id] && g_PotionCount[id] > 0)
-	{
-		DrinkPotion(id);
-		cs_set_user_bpammo(id, CSW_FLASHBANG, 0);
+		new ammo = cs_get_user_bpammo(id, CSW_HEGRENADE);
+		if (ammo > 0) ammo--;
+		cs_set_user_bpammo(id, CSW_HEGRENADE, ammo);
 		return HAM_SUPERCEDE;
 	}
 	return HAM_IGNORED;
@@ -176,6 +177,9 @@ stock DrinkPotion(id)
 	if (g_PotionCount[id] <= 0) return;
 	g_PotionCount[id]--;
 	g_InPotionMode[id] = false;
+	new ammo = cs_get_user_bpammo(id, CSW_HEGRENADE);
+	if (ammo > 0) ammo--;
+	cs_set_user_bpammo(id, CSW_HEGRENADE, ammo);
 	HealPlayer(id, get_pcvar_num(gCvarDrinkHeal));
 	emit_sound(id, CHAN_ITEM, SOUND_DRINK, 1.0, ATTN_NORM, 0, PITCH_NORM);
 	client_print(id, print_chat, "[Potion] Bebiste la poción. Pociones restantes: %d", g_PotionCount[id]);

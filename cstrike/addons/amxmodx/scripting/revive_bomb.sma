@@ -242,6 +242,7 @@ DoRevive(id, corpse) {
 		return;
 	pev(corpse, pev_origin, g_revive_origin[id]);
 	RemoveCorpse(corpse);
+	RemoveFakeCorpseForPlayer(id);
 	set_pev(id, pev_deadflag, DEAD_RESPAWNABLE);
 	dllfunc(DLLFunc_Spawn, id);
 	set_pev(id, pev_iuser1, 0);
@@ -337,6 +338,18 @@ stock RemoveAllReviveCorpses() {
 	new flags;
 	while ((ent = engfunc(EngFunc_FindEntityByString, ent, "classname", CLASS_REVIVE_CORPSE)) != 0) {
 		if (!pev_valid(ent)) continue;
+		pev(ent, pev_flags, flags);
+		set_pev(ent, pev_flags, flags | FL_KILLME);
+	}
+}
+
+stock RemoveFakeCorpseForPlayer(player_id) {
+	new ent = -1;
+	new flags;
+	static classname[32];
+	while ((ent = engfunc(EngFunc_FindEntityByString, ent, "classname", "fake_corpse")) != 0) {
+		if (!pev_valid(ent)) continue;
+		if (pev(ent, pev_owner) != player_id) continue;
 		pev(ent, pev_flags, flags);
 		set_pev(ent, pev_flags, flags | FL_KILLME);
 	}
