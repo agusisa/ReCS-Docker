@@ -37,14 +37,6 @@ RUN mkdir /opt/steam/hlds/cstrike/addons/hitboxfixer
 RUN rsync -a /opt/HitboxFixer/publish/ /opt/steam/hlds/cstrike/addons/hitboxfixer/
 RUN echo 'linux addons/hitboxfixer/hitbox_fix_mm_i386.so' >> /opt/steam/hlds/cstrike/addons/metamod/plugins.ini
 
-# YaPB (Yet another POD-Bot) - bots para jugar solo o con amigos (requiere red en build)
-ARG YAPB_VERSION=4.4.957
-RUN curl -sL "https://github.com/yapb/yapb/releases/download/${YAPB_VERSION}/yapb-${YAPB_VERSION}-linux.tar.xz" -o /tmp/yapb.tar.xz \
-    && tar -xJf /tmp/yapb.tar.xz -C /tmp \
-    && (test -d /tmp/yapb-${YAPB_VERSION}-linux && mv /tmp/yapb-${YAPB_VERSION}-linux/addons/yapb /opt/steam/hlds/cstrike/addons/) || (test -d /tmp/cstrike && rsync -a /tmp/cstrike/ /opt/steam/hlds/cstrike/) || true \
-    && rm -rf /tmp/yapb-${YAPB_VERSION}-linux /tmp/cstrike /tmp/yapb.tar.xz
-RUN echo 'linux addons/yapb/bin/yapb.so' >> /opt/steam/hlds/cstrike/addons/metamod/plugins.ini
-
 # AMX Mod X
 RUN rsync -a /opt/AMXModX/publish/addons/ /opt/steam/hlds/cstrike/addons/
 RUN echo 'linux addons/amxmodx/dlls/amxmodx_mm_i386.so' >> /opt/steam/hlds/cstrike/addons/metamod/plugins.ini
@@ -66,6 +58,14 @@ RUN mv cstrike/addons/amxmodx/scripting/*.sma cstrike/addons/amxmodx/scripting/o
 
 # Copy user data
 COPY --chmod=0755 --chown=steam:steam cstrike cstrike
+
+# YaPB (Yet another POD-Bot) - después de COPY para que no lo pise; tarball tiene addons/yapb/ en la raíz
+ARG YAPB_VERSION=4.4.957
+RUN curl -sL "https://github.com/yapb/yapb/releases/download/${YAPB_VERSION}/yapb-${YAPB_VERSION}-linux.tar.xz" -o /tmp/yapb.tar.xz \
+    && test -s /tmp/yapb.tar.xz \
+    && tar -xJf /tmp/yapb.tar.xz -C /opt/steam/hlds/cstrike \
+    && rm -f /tmp/yapb.tar.xz
+RUN echo 'linux addons/yapb/bin/yapb.so' >> /opt/steam/hlds/cstrike/addons/metamod/plugins.ini
 
 # switch to user and set permissions
 RUN chown -R steam:steam .
