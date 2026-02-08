@@ -1,5 +1,5 @@
 /**
- * Revive Bomb - Revivir aliado con E (3s) / Plantar bomba en enemigo
+ * Revive Bomb - Revivir aliado con E (5s) / Plantar bomba en enemigo (5s)
  * Al intentar revivir un cadáver con bomba: explosión, mueren revividor y cadáver (gibs).
  */
 #include <amxmodx>
@@ -13,33 +13,51 @@
 #pragma semicolon 1
 
 #define PLUGIN  "Revive Bomb"
-#define VERSION "1.0"
+#define VERSION "1.1"
 #define AUTHOR  "ReCS"
 
-#define REVIVE_TIME    3.0
-#define PLANT_TIME     1.5
+#define REVIVE_TIME    5.0
+#define PLANT_TIME     5.0
 #define CORPSE_RADIUS  70.0
 #define TICK_INTERVAL  0.1
 
 #define TASK_CORPSE       2000
 #define TASK_PROGRESS     2001
+#define TASK_REVIVE_POS   2002
 #define TE_EXPLODEMODEL   107
 
 #define CLASS_REVIVE_CORPSE "revive_corpse"
 #define pev_corpse_team     pev_iuser1
 #define pev_corpse_bomb     pev_iuser4
 
+new const SOUND_REVIVE[] = "items/smallmedkit2.wav";
+new const SOUND_PLANT[]  = "weapons/c4_plant.wav";
+
 new g_msgBarTime;
 new Float:g_progress[33];
 new g_target_ent[33];
 new bool:g_was_reviving[33];
 new bool:g_was_planting[33];
+new Float:g_revive_origin[33][3];
 
 public plugin_init() {
 	register_plugin(PLUGIN, VERSION, AUTHOR);
 	g_msgBarTime = get_user_msgid("BarTime");
 	RegisterHam(Ham_Killed, "player", "OnPlayerKilled", 1);
 	register_forward(FM_PlayerPreThink, "OnPreThink");
+	register_event("HLTV", "EventRoundStart", "a", "1=0", "2=0");
+}
+
+public EventRoundStart() {
+	RemoveAllReviveCorpses();
+	for (new i = 1; i <= 32; i++) {
+		g_progress[i] = 0.0;
+		g_target_ent[i] = 0;
+		g_was_reviving[i] = false;
+		g_was_planting[i] = false;
+		if (is_user_connected(i))
+			MsgBarTime(i, 0);
+	}
 }
 
 public plugin_precache() {
@@ -53,6 +71,8 @@ public plugin_precache() {
 	precache_model("models/player/urban/urban.mdl");
 	precache_model("models/player/vip/vip.mdl");
 	precache_sound("weapons/c4_explode_01.wav");
+	precache_sound(SOUND_REVIVE);
+	precache_sound(SOUND_PLANT);
 	precache_model("models/hgibs.mdl");
 }
 
@@ -172,6 +192,7 @@ public OnPreThink(id) {
 			MsgBarTime(id, floatround(REVIVE_TIME - g_progress[id]));
 			if (g_progress[id] >= REVIVE_TIME) {
 				DoRevive(owner, corpse);
+				emit_sound(id, CHAN_ITEM, SOUND_REVIVE, 0.8, ATTN_NORM, 0, PITCH_NORM);
 				ResetProgress(id);
 			}
 		}
@@ -184,6 +205,7 @@ public OnPreThink(id) {
 		MsgBarTime(id, floatround(PLANT_TIME - g_progress[id]));
 		if (g_progress[id] >= PLANT_TIME) {
 			set_pev(corpse, pev_corpse_bomb, 1);
+			emit_sound(id, CHAN_ITEM, SOUND_PLANT, 0.8, ATTN_NORM, 0, PITCH_NORM);
 			ResetProgress(id);
 		}
 	}
@@ -216,13 +238,22 @@ bool:IsVisible(id, entity) {
 }
 
 DoRevive(id, corpse) {
-	RemoveCorpse(corpse);
 	if (!is_user_connected(id))
 		return;
+	pev(corpse, pev_origin, g_revive_origin[id]);
+	RemoveCorpse(corpse);
 	set_pev(id, pev_deadflag, DEAD_RESPAWNABLE);
 	dllfunc(DLLFunc_Spawn, id);
 	set_pev(id, pev_iuser1, 0);
+	set_task(0.05, "TaskSetReviveOrigin", id + TASK_REVIVE_POS);
 	set_task(0.1, "TaskCheckRespawn", id + TASK_PROGRESS);
+}
+
+public TaskSetReviveOrigin(taskid) {
+	new id = taskid - TASK_REVIVE_POS;
+	if (!is_user_connected(id) || !is_user_alive(id))
+		return;
+	engfunc(EngFunc_SetOrigin, id, g_revive_origin[id]);
 }
 
 public TaskCheckRespawn(taskid) {
@@ -301,6 +332,16 @@ RemoveCorpse(ent) {
 	set_pev(ent, pev_flags, flags | FL_KILLME);
 }
 
+stock RemoveAllReviveCorpses() {
+	new ent = -1;
+	new flags;
+	while ((ent = engfunc(EngFunc_FindEntityByString, ent, "classname", CLASS_REVIVE_CORPSE)) != 0) {
+		if (!pev_valid(ent)) continue;
+		pev(ent, pev_flags, flags);
+		set_pev(ent, pev_flags, flags | FL_KILLME);
+	}
+}
+
 ResetProgress(id) {
 	g_progress[id] = 0.0;
 	g_target_ent[id] = 0;
@@ -312,6 +353,8 @@ ResetProgress(id) {
 MsgBarTime(id, seconds) {
 	if (is_user_bot(id))
 		return;
+	if (seconds < 1) seconds = 1;
+	if (seconds > 10) seconds = 10;
 	message_begin(MSG_ONE, g_msgBarTime, _, id);
 	write_byte(seconds);
 	write_byte(0);

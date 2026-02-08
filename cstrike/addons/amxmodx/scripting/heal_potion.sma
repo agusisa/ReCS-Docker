@@ -87,7 +87,18 @@ public HamPlayerSpawn(id)
 	g_InPotionMode[id] = false;
 	// Todos tienen 1 poción al comenzar la partida (una sola)
 	g_PotionCount[id] = 1;
+	// Dar flashbang para que la poción figure en el slot 4 (lista de granadas)
+	set_task(0.2, "TaskGivePotionWeapon", id);
 	return HAM_IGNORED;
+}
+
+public TaskGivePotionWeapon(id)
+{
+	if (!is_user_alive(id)) return;
+	if (g_PotionCount[id] <= 0) return;
+	// Una flashbang = representa la poción en el slot de granadas
+	if (cs_get_user_bpammo(id, CSW_FLASHBANG) < 1)
+		give_item(id, "weapon_flashbang");
 }
 
 public CmdGivePotion(id)
@@ -141,6 +152,7 @@ public HamFlashPrimary(weaponEnt)
 	if (g_InPotionMode[id] && g_PotionCount[id] > 0)
 	{
 		ThrowPotion(id);
+		cs_set_user_bpammo(id, CSW_FLASHBANG, 0);
 		return HAM_SUPERCEDE;
 	}
 	return HAM_IGNORED;
@@ -153,6 +165,7 @@ public HamFlashSecondary(weaponEnt)
 	if (g_InPotionMode[id] && g_PotionCount[id] > 0)
 	{
 		DrinkPotion(id);
+		cs_set_user_bpammo(id, CSW_FLASHBANG, 0);
 		return HAM_SUPERCEDE;
 	}
 	return HAM_IGNORED;
