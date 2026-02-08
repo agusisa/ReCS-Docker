@@ -1,4 +1,6 @@
 # docker build -t hlds_build -f build .
+# En Mac (ARM) pasar: docker build --platform=linux/amd64 -t hlds_build -f build .
+# En Ubuntu (x86_64) no hace falta --platform (usa el host). SteamCMD puede hacer segfault (exit 139) en Mac bajo emulación; en ese caso hacer el build en Ubuntu.
 FROM debian:11-slim
 #FROM debian:stable-slim
 
