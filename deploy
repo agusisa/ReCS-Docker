@@ -94,7 +94,7 @@ ENTRYPOINT [ \
     "-timeout 3", \
     "-pingboost 3", \
     "-game cstrike", \
-    "+map de_dust2", \
+    "+map fy_pool_day", \
     "-maxplayers 32", \
     "-insecure", \
     "+sys_ticrate 1000", \
